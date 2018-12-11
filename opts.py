@@ -11,8 +11,8 @@ def str2bool(v):
 parser = argparse.ArgumentParser(description="PyTorch implementation of CMP")
 parser.add_argument('--data_root', type=str, default='/data/vision/oliva/scenedataset/syntheticscene/TopViewMaskDataset')
 parser.add_argument('--test-dir', type=str, default='')
-parser.add_argument('--train-list', type=str, default='./train_list.txt')
-parser.add_argument('--eval-list', type=str, default='./val_list.txt')
+parser.add_argument('--train-list', type=str, default='./metadata/train_list.txt')
+parser.add_argument('--eval-list', type=str, default='./metadata/val_list.txt')
 parser.add_argument('--start_lr', type=float, default=2e-4)
 parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float,
                     metavar='W', help='weight decay (default: 5e-4)')
