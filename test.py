@@ -11,7 +11,7 @@
 
 """
 from utils import Foo
-from models import AVTModule
+from models import VPNModel
 from datasets import OVMDataset
 from opts import parser
 from transform import *
@@ -28,7 +28,6 @@ import cv2
 import shutil
 import dominate
 from dominate.tags import *
-from rot_models import AVTRotModule
 
 mean_rgb = [0.485, 0.456, 0.406]
 std_rgb = [0.229, 0.224, 0.225]
@@ -41,28 +40,20 @@ def main():
         encoder=args.encoder,
         decoder=args.decoder,
         fc_dim=args.fc_dim,
-        weights_encoder='',
-        weights_decoder='',
         num_views=args.n_views,
-        train=True,
-        use_mask=args.use_mask,
         num_class=94,
         transform_type=args.transform_type,
-        consensus_type=args.consensus_type,
-        intermedia_size=args.label_resolution,
-        random_pick=False,
-        center_loss=False,
-        transpose_output=args.transpose_output,
+        output_size=args.label_resolution,
     )
 
-    val_dataset = OVMDataset(args.data_root, args.eval_list, pix_file=args.pix_file,
+    val_dataset = OVMDataset(args.data_root, args.eval_list,
                          transform=torchvision.transforms.Compose([
                              Stack(roll=True),
                              ToTorchFormatTensor(div=True),
-#                             GroupNormalize(mean_rgb, std_rgb)
+                             GroupNormalize(mean_rgb, std_rgb)
                          ]),
-                         n_views=network_config.num_views, resolution=args.input_resolution,
-                         label_res=args.segSize, use_mask=args.use_mask, use_depth=args.use_depth, is_train=False)
+                         n_views=network_config.num_views, input_size=args.input_resolution,
+                         label_size=args.segSize, use_mask=args.use_mask, use_depth=args.use_depth, is_train=False)
 
     val_loader = torch.utils.data.DataLoader(
         val_dataset, batch_size=args.batch_size,
@@ -70,14 +61,10 @@ def main():
         pin_memory=True
     )
 
-    # logger = Logger(os.path.join(args.tflogdir, args.logname))
 
-    if args.rotate:
-        mapper = AVTRotModule(network_config)
-    else:
-        mapper = AVTModule(network_config)
-
+    mapper = VPNModel(network_config)
     mapper = nn.DataParallel(mapper.cuda())
+
     if args.weights:
         if os.path.isfile(args.weights):
             print(("=> loading checkpoint '{}'".format(args.weights)))
@@ -106,7 +93,6 @@ def main():
                 with table(border = 1, style = 'table-layout: fixed;'):
                     with tr():
                         for i in range(args.test_views):
-                            #if i % int(8 / args.n_views) == 0:
                             path = 'Step-{}-{}.png'.format(step * args.batch_size, i)
                             with td(style='word-wrap: break-word;', halign='center', valign='top'):
                                 img(style='width:128px', src=path)
@@ -143,7 +129,7 @@ def eval(val_loader, mapper, criterion):
     for i in range(args.num_class):
         prec_stat[str(i)] = {'intersec': 0, 'union': 0, 'all': 0}
 
-    with open('/data/vision/oliva/scenedataset/activevision/House3D/House3D/metadata/colormap_coarse.csv') as f:
+    with open('./metadata/colormap_coarse.csv') as f:
         lines = f.readlines()
     cat = []
     for line in lines:
@@ -159,36 +145,9 @@ def eval(val_loader, mapper, criterion):
         data_time.update(time.time() - end)
         with torch.no_grad():
             input_rgb_var = torch.autograd.variable(rgb_stack).cuda()
-            if args.rotate:
-                input_rgb_var = input_rgb_var.view([-1, args.n_views, input_rgb_var.size(1) // args.n_views] + list(input_rgb_var.shape[2:]))
-                if args.late_fusion:
-                    fss_list = []
-                    for view_ind in [(x * args.n_views // args.test_views + args.view_bias) % 8 for x in list(range(args.test_views))]:
-                        ret_t = torch.tensor([view_ind])
-                        input_rgb_sp = torch.index_select(input_rgb_var, 1, ret_t.cuda())
-                        input_rgb_sp = input_rgb_sp.view([input_rgb_sp.size(0), input_rgb_sp.size(1)*input_rgb_sp.size(2)] + list(input_rgb_sp.size()[3:]))
-                        ret_t = ret_t.unsqueeze(0)
-                        ret_t = ret_t.expand([input_rgb_sp.size(0), ret_t.size(1)])
-                        output = mapper(input_rgb_sp, ret_t)
-                        output = torch.exp(output)
-                        fss_list.append(output)
-                    if args.late_fusion_type == 'max':
-                        fss_logit, _ = torch.stack(fss_list, dim=1).max(dim=1, keepdim=false)
-                    elif args.late_fusion_type == 'avg':
-                        fss_logit = torch.stack(fss_list, dim=1).mean(dim=1, keepdim=false)
-                    output = torch.log(fss_logit)
-                else:
-                    ret_t = torch.tensor([(x * int(args.n_views / args.test_views) + args.view_bias) % 8 for x in list(range(args.test_views))])
-                    input_rgb_var = torch.index_select(input_rgb_var, 1, ret_t.cuda())
-                    input_rgb_var = input_rgb_var.view([input_rgb_var.size(0), input_rgb_var.size(1)*input_rgb_var.size(2)] + list(input_rgb_var.size()[3:]))
-                    ret_t = ret_t.unsqueeze(0)
-                    ret_t = ret_t.expand([input_rgb_var.size(0), ret_t.size(1)])
-                    output = mapper(input_rgb_var, ret_t)
-            else:
-                _, output = mapper(x=input_rgb_var, test_comb=list(range(args.test_views)), return_feat=True)
+            _, output = mapper(x=input_rgb_var, return_feat=True)
         target_var = target.cuda()
         target_var = target_var.view(-1)
-        # output = output.view(-1, args.num_class)
         upsample = output.view(-1, args.label_resolution, args.label_resolution, args.num_class).transpose(3,2).transpose(2,1).contiguous()
         upsample = nn.functional.upsample(upsample, size=args.segSize, mode='bilinear', align_corners=False)
         upsample = nn.functional.softmax(upsample, dim=1)
@@ -198,9 +157,7 @@ def eval(val_loader, mapper, criterion):
         loss = criterion(output, target_var)
         losses.update(loss.data[0], input_rgb_var.size(0))
         prec_stat = count_mean_accuracy(output.data, target_var.data, prec_stat)
-        prec1, prec5 = accuracy(output.data, target_var.data, topk=(1, 5))
-        top1.update(prec1[0], rgb_stack.size(0))
-        top5.update(prec5[0], rgb_stack.size(0))
+        prec1 = accuracy(output.data, target_var.data, topk=(1,))[0]
 
         batch_time.update(time.time() - end)
         end = time.time()
