@@ -37,7 +37,7 @@ class TransformModule(nn.Module):
         # shape x: B, V, C, H, W
         x = x.view(list(x.size()[:3]) + [self.dim * self.dim,])
         view_comb = self.mat_list[0](x[:, 0])
-        for index in range(x.size(0))[1:]:
+        for index in range(x.size(1))[1:]:
             view_comb += self.mat_list[index](x[:, index])
         view_comb = view_comb.view(list(view_comb.size()[:2]) + [self.dim, self.dim])
         return view_comb
