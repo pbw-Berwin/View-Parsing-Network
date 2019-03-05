@@ -3,7 +3,7 @@ import os
 from dominate.tags import *
 import dominate
 
-dataset_root = '/data/vision/oliva/scenedataset/syntheticscene/TopViewMaskDataset/'
+dataset_root = '/mnt/lustre/share/VPN_driving_scene/mp3d'
 scene_list = os.listdir(dataset_root)
 train_list = scene_list[:int(5*len(scene_list)/6)]
 val_list = scene_list[int(5*len(scene_list)/6):]
@@ -18,7 +18,7 @@ for scene_id in train_list:
     for coor in coor_set:
         coor_path = os.path.join(scene_id, coor)
         skip = False
-        if not os.path.isfile(os.path.join(dataset_root, coor_path, 'OverviewMask.png')):
+        if not os.path.isfile(os.path.join(dataset_root, coor_path, 'topdown-semantics.png')):
             skip = True
         if skip:
             continue
@@ -44,9 +44,9 @@ for scene_id in train_list:
                     path = 'OverviewMask.png'
                     with td(style='word-wrap: break-word;', halign='center', valign='top'):
                         img(style='width:256px', src=path)
-        with open(os.path.join(web_path, 'index.html'), 'w') as fp:
-            fp.write(web.render())
-            print('Index of ' + os.path.join(scene_id, coor) + ' generated!')
+        # with open(os.path.join(web_path, 'index.html'), 'w') as fp:
+        #     fp.write(web.render())
+        print('Index of ' + os.path.join(scene_id, coor) + ' generated!')
 
 for scene_id in val_list:
     print('Processing ' + scene_id)
@@ -54,7 +54,7 @@ for scene_id in val_list:
     for coor in coor_set:
         coor_path = os.path.join(scene_id, coor)
         skip = False
-        if not os.path.isfile(os.path.join(dataset_root, coor_path, 'OverviewMask.png')):
+        if not os.path.isfile(os.path.join(dataset_root, coor_path, 'topdown-semantics.png')):
             # print(os.path.join(coor_path, '0', 'topdown_view.jpg') + ' is lost')
             skip = True
         if skip:
@@ -81,9 +81,9 @@ for scene_id in val_list:
                     path = 'OverviewMask.png'
                     with td(style='word-wrap: break-word;', halign='center', valign='top'):
                         img(style='width:256px', src=path)
-        with open(os.path.join(web_path, 'index.html'), 'w') as fp:
-            fp.write(web.render())
-            print('Index of ' + os.path.join(scene_id, coor) + ' generated!')
+        # with open(os.path.join(web_path, 'index.html'), 'w') as fp:
+        #     fp.write(web.render())
+        print('Index of ' + os.path.join(scene_id, coor) + ' generated!')
 
 
 with open('train_list.txt','w') as f:

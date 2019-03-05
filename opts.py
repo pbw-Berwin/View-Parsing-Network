@@ -21,7 +21,7 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
 parser.add_argument('--transform-type', type=str, default='fc')
 parser.add_argument('--use-mask', type=str2bool, nargs='?', const=False)
 parser.add_argument('--use-depth', type=str2bool, nargs='?', const=False)
-parser.add_argument('--input-resolution', default=224, type=int, metavar='N')
+parser.add_argument('--input-resolution', default=400, type=int, metavar='N')
 parser.add_argument('--label-resolution', default=25, type=int, metavar='N')
 parser.add_argument('--fc-dim', default=256, type=int, metavar='N')
 parser.add_argument('--segSize', default=256, type=int, metavar='N')
@@ -50,7 +50,7 @@ parser.add_argument('-b', '--batch-size', default=104, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
 parser.add_argument('--scale_size', default=224, type=int)
 parser.add_argument('--num-class', default=94, type=int)
-parser.add_argument('-j', '--num_workers', default=24, type=int, metavar='N',
+parser.add_argument('-j', '--num_workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--root_model', type=str, default='model')
 parser.add_argument('--weights', type=str,

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision
 from . import resnet, resnext
-from lib.nn import SynchronizedBatchNorm2d
+from segmentTool.lib.nn import SynchronizedBatchNorm2d
 
 
 class SegmentationModuleBase(nn.Module):
