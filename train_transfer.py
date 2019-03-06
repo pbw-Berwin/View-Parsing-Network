@@ -59,7 +59,7 @@ def main():
     parser.add_argument("--tensorboard", type=str2bool, default=True)
     parser.add_argument("--tf-logdir", type=str, default='/mnt/lustre/panbowen/VPN-transfer/tf_log/',
                         help="Path to the directory of log.")
-
+    parser.add_argument('--VPN-weights', type=str)
 
     args = parser.parse_args()
 
@@ -105,6 +105,7 @@ def main():
 
     mapper = VPNModel(network_config)
     mapper = nn.DataParallel(mapper.cuda())
+    mapper.train()
 
     model_D1 = FCDiscriminator(num_classes=args.num_classes)
     model_D1 = nn.DataParallel(model_D1.cuda())
@@ -113,6 +114,17 @@ def main():
     # model_D1.to(device)
     # model_D2.train()
     # model_D2.to(device)
+
+    if args.VPN_weights:
+        if os.path.isfile(args.VPN_weights):
+            print(("=> loading checkpoint '{}'".format(args.VPN_weights)))
+            checkpoint = torch.load(args.VPN_weights)
+            args.start_epoch = checkpoint['epoch']
+            mapper.load_state_dict(checkpoint['state_dict'])
+            print(("=> loaded checkpoint '{}' (epoch {})"
+                  .format(args.VPN_weights, checkpoint['epoch'])))
+        else:
+            print(("=> no checkpoint found at '{}'".format(args.VPN_weights)))
 
     if args.resume_G:
         if os.path.isfile(args.resume_G):
@@ -204,11 +216,21 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             input_rgb_var = torch.autograd.Variable(rgb_stack).cuda()
 
             _, pred_feat = mapper(input_rgb_var, return_feat=True)
+            # _ = _.view(-1, args.num_class)
+            # label_var = label_var.view(-1)
+            # seg_loss = seg_loss(_, label_var)
+            # print(seg_loss.item())
+            # raise NotImplementedError
+
+            # print(pred_feat[0, 0, 0, :])
+
             pred_feat = pred_feat.transpose(3, 2).transpose(2, 1).contiguous()
             pred = interp(pred_feat)
 
             pred = F.log_softmax(pred, dim=1)
-            pred.transpose(1, 2).transpose(2, 3).contiguous()
+            pred = pred.transpose(1, 2).transpose(2, 3).contiguous()
+            # print(pred[0, 0, 0, :])
+
             label_var = label_var.view(-1)
             output = pred.view(-1, args.num_class)
 
@@ -227,10 +249,8 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             input_rgb_var = torch.autograd.Variable(rgb_stack).cuda()
             _, pred_target = mapper(input_rgb_var, return_feat=True)
             pred_target = pred_target.transpose(3, 2).transpose(2, 1).contiguous()
-
-            # pred_t = interp_target(pred_t)
             pred_target = interp_target(pred_target)
-
+            pred_target = F.log_softmax(pred_target, dim=1)
             D_out = model_D1(torch.exp(pred_target))
 
             loss_adv_target = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(source_label).cuda())
@@ -247,8 +267,11 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             # train with source
 
             pred = pred.detach()
+            pred = pred.transpose(3, 2).transpose(2, 1).contiguous()
+            # print(pred.size())
+            # raise NotImplementedError
+            D_out = model_D1(torch.exp(pred))
 
-            D_out = model_D1(pred)
             loss_D = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(source_label).cuda())
             loss_D = loss_D / args.iter_size / 2
             loss_D.backward()
@@ -258,7 +281,7 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             # train with target
             pred_target = pred_target.detach()
 
-            D_out = model_D1(pred_target)
+            D_out = model_D1(torch.exp(pred_target))
 
             loss_D = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(target_label).cuda())
 
