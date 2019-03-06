@@ -17,10 +17,18 @@ import shutil
 import torch.nn.functional as F
 import os.path as osp
 from tensorboardX import SummaryWriter
+import argparse
 
 mean_rgb = [0.485, 0.456, 0.406]
 std_rgb = [0.229, 0.224, 0.225]
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Unsupported value encountered.')
 
 def main():
     global args, best_prec1
@@ -48,8 +56,8 @@ def main():
     parser.add_argument('--num_steps_stop', type=int, default=150000)
     parser.add_argument('--save_pred_every', type=int, default=5000)
     parser.add_argument('--snapshot-dir', type=str, default='/mnt/lustre/panbowen/VPN-transfer/snapshot/')
-    parser.add_argument("--tensorboard", action='store_true', help="choose whether to use tensorboard.")
-    parser.add_argument("--tf_logdir", type=str, default='/mnt/lustre/panbowen/VPN-transfer/tf_log/',
+    parser.add_argument("--tensorboard", type=str2bool, default=True)
+    parser.add_argument("--tf-logdir", type=str, default='/mnt/lustre/panbowen/VPN-transfer/tf_log/',
                         help="Path to the directory of log.")
 
 
@@ -156,10 +164,10 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
 
     # set up tensor board
     if args.tensorboard:
-        if not os.path.exists(args.log_dir):
-            os.makedirs(args.log_dir)
+        if not os.path.exists(args.tf_logdir):
+            os.makedirs(args.tf_logdir)
 
-        writer = SummaryWriter(args.log_dir)
+        writer = SummaryWriter(args.tf_logdir)
 
     interp = nn.Upsample(size=(args.SegSize, args.SegSize), mode='bilinear', align_corners=True)
     interp_target = nn.Upsample(size=(args.SegSize_target, args.SegSize_target), mode='bilinear', align_corners=True)
@@ -268,6 +276,7 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             }
 
             if i_iter % 10 == 0:
+                print(args.tf_logdir)
                 for key, val in scalar_info.items():
                     writer.add_scalar(key, val, i_iter)
 
