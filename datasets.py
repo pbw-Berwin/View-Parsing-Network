@@ -145,6 +145,7 @@ class House3D_Dataset(data.Dataset):
             if x.split('/')[0] != 'e042c74158a0b1dad5f1b6a689fd056a':
                 tmp.append(x)
         self.coor_list = [PointRGBRecord(item) for item in tmp]
+        self.coor_list = self.coor_list[:15800]
         print('Coordinate number:%d'%(len(self.coor_list)))
 
     def _parse_color(self):
@@ -214,6 +215,7 @@ class MP3D_Dataset(data.Dataset):
             x = x.strip()
             tmp.append(x)
         self.coor_list = [RealRGBRecord(item) for item in tmp]
+        self.coor_list = self.coor_list[:220]
         print('Coordinate number:%d'%(len(self.coor_list)))
 
     def _parse_color(self):
