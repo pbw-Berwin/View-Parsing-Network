@@ -266,7 +266,6 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             loss.backward()
             loss_adv_target_value += loss_adv_target.item() / args.iter_size_G
 
-            optimizer.step()
 
         # train D
         # bring back requires_grad
@@ -300,7 +299,8 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             loss_D.backward()
             loss_D_value += loss_D.item()
 
-            optimizer_D1.step()
+        optimizer.step()
+        optimizer_D1.step()
 
         if args.tensorboard:
             scalar_info = {
