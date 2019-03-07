@@ -31,6 +31,7 @@ train_output = []
 for scene_id in train_list:
     print('Processing ' + scene_id)
     coor_set = sorted(os.listdir(os.path.join(nuScenes_data_root, scene_id, 'CAM_RGB_FRONT')))
+    coor_set = coor_set[:18220]
 
     for coor in coor_set:
         coor_path = os.path.join(scene_id, 'CAM_RGB_FRONT', coor)

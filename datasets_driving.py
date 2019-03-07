@@ -5,6 +5,7 @@ import os
 import os.path
 import numpy as np
 import json
+import sys
 
 class PointRGBRecord(object):
     def __init__(self, path, height):
@@ -47,7 +48,7 @@ class PointRGBRecord(object):
         return self.number.split('.')[0]
 
 
-class OVMDataset(data.Dataset):
+class Carla_Dataset(data.Dataset):
     def __init__(self, datadir, split, transform, is_train=True,
                  num_views=8, input_size=224, label_size=25,
                  use_mask=False, use_depth=False, height=10):
@@ -98,13 +99,13 @@ class OVMDataset(data.Dataset):
                      cv2.imread(os.path.join(self.datadir, example.RGB_BACK_RIGHT_input())),
                      cv2.imread(os.path.join(self.datadir, example.RGB_BACK_LEFT_input()))]
 
-        print('\n\n\n\n', os.path.join(self.datadir, example.RGB_FRONT_input()),
-              os.path.join(self.datadir, example.RGB_FRONT_LEFT_input()),
-                           os.path.join(self.datadir, example.RGB_FRONT_RIGHT_input()),
-                                        os.path.join(self.datadir, example.RGB_BACK_input()),
-                                                     os.path.join(self.datadir, example.RGB_BACK_RIGHT_input()),
-                                                     os.path.join(self.datadir, example.RGB_BACK_LEFT_input()),
-                                                     '\n\n\n\n')
+        # print('\n\n\n\n', os.path.join(self.datadir, example.RGB_FRONT_input()),
+        #       os.path.join(self.datadir, example.RGB_FRONT_LEFT_input()),
+        #                    os.path.join(self.datadir, example.RGB_FRONT_RIGHT_input()),
+        #                                 os.path.join(self.datadir, example.RGB_BACK_input()),
+        #                                              os.path.join(self.datadir, example.RGB_BACK_RIGHT_input()),
+        #                                              os.path.join(self.datadir, example.RGB_BACK_LEFT_input()),
+        #                                              '\n\n\n\n')
 
         split_data = []
         for img in input_img:
@@ -124,6 +125,90 @@ class OVMDataset(data.Dataset):
             rgb_origin = np.concatenate([np.expand_dims(x, 0) for x in image], axis=0)
             return input_data, mask.long(), rgb_origin, om_orig[:, :, -1]
         return input_data, mask.long()
+
+    def __len__(self):
+        return len(self.coor_list)
+
+
+class nuScenes_Dataset(data.Dataset):
+    def __init__(self, datadir, split, transform, is_train=True,
+                 num_views=8, input_size=224, label_size=25,
+                 use_mask=False, use_depth=False, height=10):
+        self.datadir = datadir
+        self.split = split
+        self.transform = transform
+        self.is_train = is_train
+        self.num_views = num_views
+        self.input_size = input_size
+        self.label_size = label_size
+        self.use_mask = use_mask
+        self.use_depth = use_depth
+        self.height = height
+        print('use mask: ', self.use_mask)
+        print('use depth: ', self.use_depth)
+        self._parse_list()
+        self._parse_color()
+
+    def _parse_list(self):
+        tmp = []
+        for x in open(self.split):
+            x = x.strip()
+            tmp.append(x)
+        self.coor_list = [PointRGBRecord(item, height=self.height) for item in tmp]
+        print('Coordinate number:%d' % (len(self.coor_list)))
+
+    def _parse_color(self):
+        with open('./metadata/colormap_coarse.csv') as f:
+            lines = f.readlines()
+        cat = []
+        for line in lines:
+            line = line.rstrip()
+            cat.append(line)
+        cat = cat[1:]
+        self.label_dic = {}
+        for i, value in enumerate(cat):
+            key = ','.join(value.split(',')[1:])
+            self.label_dic[key] = i
+
+    def __getitem__(self, item):
+        example = self.coor_list[item]
+        input_data = list()
+
+        input_img = [cv2.imread(os.path.join(self.datadir, example.RGB_FRONT_input())),
+                     cv2.imread(os.path.join(self.datadir, example.RGB_FRONT_LEFT_input())),
+                     cv2.imread(os.path.join(self.datadir, example.RGB_FRONT_RIGHT_input())),
+                     cv2.imread(os.path.join(self.datadir, example.RGB_BACK_input())),
+                     cv2.imread(os.path.join(self.datadir, example.RGB_BACK_RIGHT_input())),
+                     cv2.imread(os.path.join(self.datadir, example.RGB_BACK_LEFT_input()))]
+
+        # print('\n\n\n\n', os.path.join(self.datadir, example.RGB_FRONT_input()),
+        #       os.path.join(self.datadir, example.RGB_FRONT_LEFT_input()),
+        #                    os.path.join(self.datadir, example.RGB_FRONT_RIGHT_input()),
+        #                                 os.path.join(self.datadir, example.RGB_BACK_input()),
+        #                                              os.path.join(self.datadir, example.RGB_BACK_RIGHT_input()),
+        #                                              os.path.join(self.datadir, example.RGB_BACK_LEFT_input()),
+        #                                              '\n\n\n\n')
+        sys.stdout.flush()
+
+        split_data = []
+        for img in input_img:
+            # print(img is None)
+            resized_img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_NEAREST)
+            split_data.append(resized_img)
+        input_data.extend(split_data)
+
+        # image = input_data.copy()
+        input_data = self.transform(input_data)
+
+        # om_orig = cv2.imread(os.path.join(self.datadir, example.OverviewMask))
+        #
+        # om = cv2.resize(om_orig[:, :, ::-1], (self.label_size, self.label_size), interpolation=cv2.INTER_NEAREST)
+        #
+        # mask = torch.from_numpy(om[:, :, 0])
+        # if not self.is_train:
+        #     rgb_origin = np.concatenate([np.expand_dims(x, 0) for x in image], axis=0)
+        #     return input_data, mask.long(), rgb_origin, om_orig[:, :, -1]
+        return input_data
 
     def __len__(self):
         return len(self.coor_list)
