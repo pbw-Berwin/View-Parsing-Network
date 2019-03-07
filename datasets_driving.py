@@ -1,12 +1,9 @@
+import cv2
 import torch.utils.data as data
 import torch
 import os
 import os.path
 import numpy as np
-from numpy.random import randint
-import concurrent.futures
-import cv2
-from PIL import Image
 import json
 
 class PointRGBRecord(object):
@@ -35,11 +32,11 @@ class PointRGBRecord(object):
 
     @property
     def OverviewMask(self):
-        return os.path.join(self.episode, 'Camera_SemSeg_TOPDOWN_{}'.format(self.height), self.number)
+        return os.path.join(self.episode, 'CAM_SemSeg_TOPDOWN_{}'.format(self.height), self.number)
 
     @property
     def OverviewMap(self):
-        return os.path.join(self.episode, 'Camera_RGB_TOPDOWN_{}'.format(self.height), self.number)
+        return os.path.join(self.episode, 'CAM_RGB_TOPDOWN_{}'.format(self.height), self.number)
 
     @property
     def video_frame(self):
@@ -93,12 +90,21 @@ class OVMDataset(data.Dataset):
     def __getitem__(self, item):
         example = self.coor_list[item]
         input_data = list()
+
         input_img = [cv2.imread(os.path.join(self.datadir, example.RGB_FRONT_input())),
                      cv2.imread(os.path.join(self.datadir, example.RGB_FRONT_LEFT_input())),
                      cv2.imread(os.path.join(self.datadir, example.RGB_FRONT_RIGHT_input())),
                      cv2.imread(os.path.join(self.datadir, example.RGB_BACK_input())),
                      cv2.imread(os.path.join(self.datadir, example.RGB_BACK_RIGHT_input())),
                      cv2.imread(os.path.join(self.datadir, example.RGB_BACK_LEFT_input()))]
+
+        print('\n\n\n\n', os.path.join(self.datadir, example.RGB_FRONT_input()),
+              os.path.join(self.datadir, example.RGB_FRONT_LEFT_input()),
+                           os.path.join(self.datadir, example.RGB_FRONT_RIGHT_input()),
+                                        os.path.join(self.datadir, example.RGB_BACK_input()),
+                                                     os.path.join(self.datadir, example.RGB_BACK_RIGHT_input()),
+                                                     os.path.join(self.datadir, example.RGB_BACK_LEFT_input()),
+                                                     '\n\n\n\n')
 
         split_data = []
         for img in input_img:
@@ -108,6 +114,7 @@ class OVMDataset(data.Dataset):
 
         image = input_data.copy()
         input_data = self.transform(input_data)
+
         om_orig = cv2.imread(os.path.join(self.datadir, example.OverviewMask))
 
         om = cv2.resize(om_orig[:, :, ::-1], (self.label_size, self.label_size), interpolation=cv2.INTER_NEAREST)

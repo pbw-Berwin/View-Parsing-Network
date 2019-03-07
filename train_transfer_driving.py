@@ -1,7 +1,6 @@
-from utils import Foo
+from datasets_driving import OVMDataset
 from models import VPNModel, FCDiscriminator
-from datasets import House3D_Dataset, MP3D_Dataset
-from datasets import OVMDataset
+from utils import Foo
 from opts import parser
 from transform import *
 import torchvision
@@ -36,9 +35,9 @@ def main():
     best_prec1 = 0
 
     parser.add_argument('--source_dir', type=str,
-                        default='/mnt/lustre/share/VPN_driving_scene/TopViewMaskDataset')
+                        default='./data/Carla_Dataset_v1/')
     parser.add_argument('--target_dir', type=str,
-                        default='/mnt/lustre/share/VPN_driving_scene/mp3d')
+                        default='./data/nuScenes/')
     parser.add_argument('--num-steps', type=int, default=250000)
     parser.add_argument('--iter-size', type=int, default=1)
     parser.add_argument('--learning-rate-D', type=float, default=1e-4)
@@ -58,9 +57,9 @@ def main():
     parser.add_argument('--save_pred_every', type=int, default=5000)
     parser.add_argument('--snapshot-dir', type=str, default='/mnt/lustre/panbowen/VPN-transfer/snapshot/')
     parser.add_argument("--tensorboard", type=str2bool, default=True)
-    parser.add_argument("--tf-logdir", type=str, default='/mnt/lustre/panbowen/VPN-transfer/tf_log/',
+    parser.add_argument("--tf-logdir", type=str, default='./tf_log/',
                         help="Path to the directory of log.")
-
+    parser.add_argument('--VPN-weights', type=str)
 
     args = parser.parse_args()
 
@@ -70,11 +69,11 @@ def main():
         fc_dim=args.fc_dim,
         output_size=args.label_resolution,
         num_views=args.n_views,
-        num_class=13,
+        num_class=94,
         transform_type=args.transform_type,
     )
 
-    train_source_dataset = OVMDataset(datadir=args.source_dir, split=args.train_source_list,
+    train_source_dataset = OVMDataset(args.source_dir, args.train_source_list,
                         transform=torchvision.transforms.Compose([
                              Stack(roll=True),
                              ToTorchFormatTensor(div=True),
@@ -83,7 +82,7 @@ def main():
                         num_views=network_config.num_views, input_size=args.input_resolution,
                         label_size=args.SegSize)
 
-    train_target_dataset = OVMDataset(datadir=args.target_dir, split=args.train_target_list,
+    train_target_dataset = OVMDataset(args.target_dir, args.train_target_list,
                          transform=torchvision.transforms.Compose([
                             Stack(roll=True),
                             ToTorchFormatTensor(div=True),
@@ -106,6 +105,7 @@ def main():
 
     mapper = VPNModel(network_config)
     mapper = nn.DataParallel(mapper.cuda())
+    mapper.train()
 
     model_D1 = FCDiscriminator(num_classes=args.num_classes)
     model_D1 = nn.DataParallel(model_D1.cuda())
@@ -114,6 +114,17 @@ def main():
     # model_D1.to(device)
     # model_D2.train()
     # model_D2.to(device)
+
+    if args.VPN_weights:
+        if os.path.isfile(args.VPN_weights):
+            print(("=> loading checkpoint '{}'".format(args.VPN_weights)))
+            checkpoint = torch.load(args.VPN_weights)
+            args.start_epoch = checkpoint['epoch']
+            mapper.load_state_dict(checkpoint['state_dict'])
+            print(("=> loaded checkpoint '{}' (epoch {})"
+                  .format(args.VPN_weights, checkpoint['epoch'])))
+        else:
+            print(("=> no checkpoint found at '{}'".format(args.VPN_weights)))
 
     if args.resume_G:
         if os.path.isfile(args.resume_G):
@@ -205,11 +216,21 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             input_rgb_var = torch.autograd.Variable(rgb_stack).cuda()
 
             _, pred_feat = mapper(input_rgb_var, return_feat=True)
+            # _ = _.view(-1, args.num_class)
+            # label_var = label_var.view(-1)
+            # seg_loss = seg_loss(_, label_var)
+            # print(seg_loss.item())
+            # raise NotImplementedError
+
+            # print(pred_feat[0, 0, 0, :])
+
             pred_feat = pred_feat.transpose(3, 2).transpose(2, 1).contiguous()
             pred = interp(pred_feat)
 
             pred = F.log_softmax(pred, dim=1)
-            pred.transpose(1, 2).transpose(2, 3).contiguous()
+            pred = pred.transpose(1, 2).transpose(2, 3).contiguous()
+            # print(pred[0, 0, 0, :])
+
             label_var = label_var.view(-1)
             output = pred.view(-1, args.num_class)
 
@@ -228,10 +249,8 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             input_rgb_var = torch.autograd.Variable(rgb_stack).cuda()
             _, pred_target = mapper(input_rgb_var, return_feat=True)
             pred_target = pred_target.transpose(3, 2).transpose(2, 1).contiguous()
-
-            # pred_t = interp_target(pred_t)
             pred_target = interp_target(pred_target)
-
+            pred_target = F.log_softmax(pred_target, dim=1)
             D_out = model_D1(torch.exp(pred_target))
 
             loss_adv_target = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(source_label).cuda())
@@ -248,8 +267,11 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             # train with source
 
             pred = pred.detach()
+            pred = pred.transpose(3, 2).transpose(2, 1).contiguous()
+            # print(pred.size())
+            # raise NotImplementedError
+            D_out = model_D1(torch.exp(pred))
 
-            D_out = model_D1(pred)
             loss_D = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(source_label).cuda())
             loss_D = loss_D / args.iter_size / 2
             loss_D.backward()
@@ -259,7 +281,7 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             # train with target
             pred_target = pred_target.detach()
 
-            D_out = model_D1(pred_target)
+            D_out = model_D1(torch.exp(pred_target))
 
             loss_D = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(target_label).cuda())
 

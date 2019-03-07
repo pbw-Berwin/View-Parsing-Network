@@ -1,3 +1,5 @@
+mkdir -p log
 # driving scene
-python train_transfer_driving.py --batch-size 15 --tensorboard true --n-views 6
-# srun -p Segmentation python train_transfer_driving.py --batch-size 15 --tensorboard true --n-views 6 2>&1 > log/vpn.log &
+# python train_transfer_driving.py -u --batch-size 15 --tensorboard true --n-views 6 --train_source_list tools/train_source_list.txt --train_target_list tools/train_target_list.txt --VPN-weights ./pretrained/VPN_pretrain_RGB.pth.tar
+srun -p Segmentation --gres=gpu:1 -n1 --job-name=MapNet python -u train_transfer_driving.py --batch-size 10 --tensorboard true --n-views 6 --train_source_list tools/train_source_list.txt --train_target_list tools/train_target_list.txt --VPN-weights ./pretrained/VPN_pretrain_RGB.pth.tar 2>&1 > log/vpn.log &
+# srun -p Segmentation --gres=gpu:1 -n1 --job-name=MapNet python -u train_transfer_driving.py --batch-size 15 --tensorboard true --n-views 6 --train_source_list tools/train_source_list.txt --train_target_list tools/train_target_list.txt 2>&1 > log/vpn.log &

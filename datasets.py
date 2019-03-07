@@ -1,12 +1,9 @@
+import cv2
 import torch.utils.data as data
 import torch
 import os
 import os.path
 import numpy as np
-from numpy.random import randint
-import concurrent.futures
-import cv2
-from PIL import Image
 
 class PointRGBRecord(object):
     def __init__(self, path):
