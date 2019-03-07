@@ -39,7 +39,8 @@ def main():
     parser.add_argument('--target_dir', type=str,
                         default='/mnt/lustre/share/VPN_driving_scene/mp3d')
     parser.add_argument('--num-steps', type=int, default=250000)
-    parser.add_argument('--iter-size', type=int, default=1)
+    parser.add_argument('--iter-size-G', type=int, default=3)
+    parser.add_argument('--iter-size-D', type=int, default=1)
     parser.add_argument('--learning-rate-D', type=float, default=1e-4)
     parser.add_argument('--learning-rate', type=float, default=2.5e-4)
     parser.add_argument("--SegSize", type=int, default=128,
@@ -60,6 +61,7 @@ def main():
     parser.add_argument("--tf-logdir", type=str, default='/mnt/lustre/panbowen/VPN-transfer/tf_log/',
                         help="Path to the directory of log.")
     parser.add_argument('--VPN-weights', type=str)
+    parser.add_argument('--task-id', type=str)
 
     args = parser.parse_args()
 
@@ -126,14 +128,16 @@ def main():
         else:
             print(("=> no checkpoint found at '{}'".format(args.VPN_weights)))
 
+    resume_iter = None
     if args.resume_G:
         if os.path.isfile(args.resume_G):
             print(("=> loading checkpoint '{}'".format(args.resume_G)))
-            checkpoint = torch.load(args.resume_G)
-            args.start_epoch = checkpoint['epoch']
-            mapper.load_state_dict(checkpoint['state_dict'])
+            state_dict = torch.load(args.resume_G)
+            # args.start_epoch = checkpoint['epoch']
+            mapper.load_state_dict(state_dict)
             print(("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.evaluate, checkpoint['epoch'])))
+            resume_iter = int(args.resume_G.split('_')[-1].split('.')[0])
         else:
             print(("=> no checkpoint found at '{}'".format(args.resume_G)))
 
@@ -162,13 +166,14 @@ def main():
     criterion_seg = nn.NLLLoss(weight=None, size_average=True)
     criterion_bce = nn.BCEWithLogitsLoss()
 
-    if not os.path.isdir(args.log_root):
-        os.mkdir(args.log_root)
-    log_train = open(os.path.join(args.log_root, '%s.csv' % args.store_name), 'w')
+    # if not os.path.isdir(args.log_root):
+    #     os.mkdir(os.path.join(args.log_root, args.task_id))
+    # log_train = open(os.path.join(args.log_root, args '%s.csv' % args.store_name), 'w')
 
-    train(source_loader, target_loader, mapper, model_D1, criterion_seg, criterion_bce, optimizer, optimizer_D1, log_train)
+    train(source_loader, target_loader, mapper, model_D1,
+          criterion_seg, criterion_bce, optimizer, optimizer_D1, resume_iter)
 
-def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, optimizer, optimizer_D1, log):
+def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, optimizer, optimizer_D1, resume_iter):
     source_loader_iter = enumerate(source_loader)
 
     # raise NotImplementedError
@@ -176,10 +181,10 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
 
     # set up tensor board
     if args.tensorboard:
-        if not os.path.exists(args.tf_logdir):
-            os.makedirs(args.tf_logdir)
+        if not os.path.exists(os.path.join(args.tf_logdir, args.task_id)):
+            os.makedirs(os.path.join(args.tf_logdir, args.task_id))
 
-        writer = SummaryWriter(args.tf_logdir)
+        writer = SummaryWriter(os.path.join(args.tf_logdir, args.task_id))
 
     interp = nn.Upsample(size=(args.SegSize, args.SegSize), mode='bilinear', align_corners=True)
     interp_target = nn.Upsample(size=(args.SegSize_target, args.SegSize_target), mode='bilinear', align_corners=True)
@@ -187,6 +192,9 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
     target_label = 1
 
     for i_iter in range(args.num_steps):
+        if resume_iter is not None and i_iter < resume_iter:
+            continue
+
         loss_seg_value = 0
         loss_adv_target_value = 0
         loss_D_value = 0
@@ -197,12 +205,12 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
         optimizer_D1.zero_grad()
         adjust_learning_rate_D(optimizer_D1, i_iter)
 
+        # train G
+        # don't accumulate grads in D
+        for param in model_D1.parameters():
+            param.requires_grad = False
 
-        for sub_i in range(args.iter_size):
-            # train G
-            # don't accumulate grads in D
-            for param in model_D1.parameters():
-                param.requires_grad = False
+        for sub_i in range(args.iter_size_G):
             # train with source
 
             # raise NotImplementedError
@@ -235,9 +243,9 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             output = pred.view(-1, args.num_class)
 
             loss_seg = seg_loss(output, label_var)
-            loss = loss_seg / args.iter_size
+            loss = loss_seg / args.iter_size_G
             loss.backward()
-            loss_seg_value += loss_seg.item() / args.iter_size
+            loss_seg_value += loss_seg.item() / args.iter_size_G
 
             # train with target
             try:
@@ -254,15 +262,18 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             D_out = model_D1(torch.exp(pred_target))
 
             loss_adv_target = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(source_label).cuda())
-            loss = args.lambda_adv_target * loss_adv_target / args.iter_size
+            loss = args.lambda_adv_target * loss_adv_target / args.iter_size_G
             loss.backward()
-            loss_adv_target_value += loss_adv_target.item() / args.iter_size
+            loss_adv_target_value += loss_adv_target.item() / args.iter_size_G
 
-            # train D
+            optimizer.step()
 
-            # bring back requires_grad
-            for param in model_D1.parameters():
-                param.requires_grad = True
+        # train D
+        # bring back requires_grad
+        for param in model_D1.parameters():
+            param.requires_grad = True
+
+        for sub_i in range(args.iter_size_D):
 
             # train with source
 
@@ -273,7 +284,7 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             D_out = model_D1(torch.exp(pred))
 
             loss_D = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(source_label).cuda())
-            loss_D = loss_D / args.iter_size / 2
+            loss_D = loss_D / args.iter_size_D / 2
             loss_D.backward()
 
             loss_D_value += loss_D.item()
@@ -285,11 +296,11 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
 
             loss_D = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(target_label).cuda())
 
-            loss_D = loss_D / args.iter_size / 2
+            loss_D = loss_D / args.iter_size_D / 2
             loss_D.backward()
             loss_D_value += loss_D.item()
-        optimizer.step()
-        optimizer_D1.step()
+
+            optimizer_D1.step()
 
         if args.tensorboard:
             scalar_info = {
