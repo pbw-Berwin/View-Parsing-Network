@@ -51,7 +51,7 @@ def main():
     parser.add_argument('--lambda_adv_target', type=float, default=0.001)
     parser.add_argument('--num_steps_stop', type=int, default=150000)
     parser.add_argument('--save_pred_every', type=int, default=5000)
-    parser.add_argument('--snapshot-dir', type=str, default='/mnt/lustre/panbowen/VPN-transfer/snapshot/')
+    parser.add_argument('--snapshot-dir', type=str, default='./snapshot/')
     parser.add_argument("--tensorboard", type=str2bool, default=True)
     parser.add_argument("--tf-logdir", type=str, default='./tf_log/',
                         help="Path to the directory of log.")
@@ -66,7 +66,7 @@ def main():
         fc_dim=args.fc_dim,
         output_size=args.label_resolution,
         num_views=args.n_views,
-        num_class=94,
+        num_class=args.num_class,
         transform_type=args.transform_type,
     )
 
@@ -315,14 +315,14 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
 
         if i_iter >= args.num_steps_stop - 1:
             print('save model ...')
-            torch.save(mapper.state_dict(), osp.join(args.snapshot_dir, 'House3D_' + str(args.num_steps_stop) + '.pth'))
-            torch.save(model_D1.state_dict(), osp.join(args.snapshot_dir, 'House3D_' + str(args.num_steps_stop) + '_D.pth'))
+            torch.save(mapper.state_dict(), osp.join(args.snapshot_dir, '3-1_' + str(args.num_steps_stop) + '.pth'))
+            torch.save(model_D1.state_dict(), osp.join(args.snapshot_dir, '3-1_' + str(args.num_steps_stop) + '_D.pth'))
             break
 
         if i_iter % args.save_pred_every == 0 and i_iter != 0:
             print('taking snapshot ...')
-            torch.save(mapper.state_dict(), osp.join(args.snapshot_dir, 'House3D_' + str(i_iter) + '.pth'))
-            torch.save(model_D1.state_dict(), osp.join(args.snapshot_dir, 'House3D_' + str(i_iter) + '_D.pth'))
+            torch.save(mapper.state_dict(), osp.join(args.snapshot_dir, '3-1_' + str(i_iter) + '.pth'))
+            torch.save(model_D1.state_dict(), osp.join(args.snapshot_dir, '3-1_' + str(i_iter) + '_D.pth'))
 
     if args.tensorboard:
         writer.close()
