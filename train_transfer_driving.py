@@ -50,7 +50,7 @@ def main():
     parser.add_argument('--power', type=float, default=0.9)
     parser.add_argument('--lambda_adv_target', type=float, default=0.001)
     parser.add_argument('--num_steps_stop', type=int, default=150000)
-    parser.add_argument('--save_pred_every', type=int, default=5000)
+    parser.add_argument('--save_pred_every', type=int, default=250, help='5000')
     parser.add_argument('--snapshot-dir', type=str, default='./snapshot/')
     parser.add_argument("--tensorboard", type=str2bool, default=True)
     parser.add_argument("--tf-logdir", type=str, default='./tf_log/',
@@ -228,9 +228,9 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             # print(pred_feat[0, 0, 0, :])
 
             pred_feat = pred_feat.transpose(3, 2).transpose(2, 1).contiguous()
-            pred = interp(pred_feat)
+            pred_feat = interp(pred_feat)
 
-            pred = F.log_softmax(pred, dim=1)
+            pred = F.log_softmax(pred_feat, dim=1)
             pred = pred.transpose(1, 2).transpose(2, 3).contiguous()
             # print(pred[0, 0, 0, :])
 
@@ -253,8 +253,8 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             _, pred_target = mapper(input_rgb_var, return_feat=True)
             pred_target = pred_target.transpose(3, 2).transpose(2, 1).contiguous()
             pred_target = interp_target(pred_target)
-            pred_target = F.log_softmax(pred_target, dim=1)
-            D_out = model_D1(torch.exp(pred_target))
+            # pred_target = F.log_softmax(pred_target, dim=1)
+            D_out = model_D1(pred_target)
 
             loss_adv_target = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(source_label).cuda())
             loss = args.lambda_adv_target * loss_adv_target / args.iter_size_G
@@ -271,11 +271,11 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
 
             # train with source
 
-            pred = pred.detach()
-            pred = pred.transpose(3, 2).transpose(2, 1).contiguous()
+            pred_feat = pred_feat.detach()
+            # pred = pred.transpose(3, 2).transpose(2, 1).contiguous()
             # print(pred.size())
             # raise NotImplementedError
-            D_out = model_D1(torch.exp(pred))
+            D_out = model_D1(pred_feat)
 
             loss_D = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(source_label).cuda())
             loss_D = loss_D / args.iter_size_D / 2
@@ -286,7 +286,7 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             # train with target
             pred_target = pred_target.detach()
 
-            D_out = model_D1(torch.exp(pred_target))
+            D_out = model_D1(pred_target)
 
             loss_D = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(target_label).cuda())
 
@@ -315,14 +315,14 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
 
         if i_iter >= args.num_steps_stop - 1:
             print('save model ...')
-            torch.save(mapper.state_dict(), osp.join(args.snapshot_dir, '3-1_' + str(args.num_steps_stop) + '.pth'))
-            torch.save(model_D1.state_dict(), osp.join(args.snapshot_dir, '3-1_' + str(args.num_steps_stop) + '_D.pth'))
+            torch.save(mapper.state_dict(), osp.join(args.snapshot_dir, args.task_id + '_' + str(args.num_steps_stop) + '.pth'))
+            torch.save(model_D1.state_dict(), osp.join(args.snapshot_dir, args.task_id + '_' + str(args.num_steps_stop) + '_D.pth'))
             break
 
         if i_iter % args.save_pred_every == 0 and i_iter != 0:
             print('taking snapshot ...')
-            torch.save(mapper.state_dict(), osp.join(args.snapshot_dir, '3-1_' + str(i_iter) + '.pth'))
-            torch.save(model_D1.state_dict(), osp.join(args.snapshot_dir, '3-1_' + str(i_iter) + '_D.pth'))
+            torch.save(mapper.state_dict(), osp.join(args.snapshot_dir, args.task_id + '_' + str(i_iter) + '.pth'))
+            torch.save(model_D1.state_dict(), osp.join(args.snapshot_dir, args.task_id + '_' + str(i_iter) + '_D.pth'))
 
     if args.tensorboard:
         writer.close()

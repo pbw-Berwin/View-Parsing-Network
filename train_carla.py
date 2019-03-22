@@ -28,7 +28,7 @@ def main():
         fc_dim=args.fc_dim,
         output_size=args.label_resolution,
         num_views=args.n_views,
-        num_class=94,
+        num_class=args.num_class,
         transform_type=args.transform_type,
     )
     train_dataset = OVMDataset(args.data_root, args.train_list,
