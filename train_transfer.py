@@ -1,6 +1,6 @@
 from utils import Foo
 from models import VPNModel, FCDiscriminator
-from datasets import House3D_Dataset, MP3D_Dataset
+from datasets import House3D_Dataset, MP3D_Dataset, Carla_Dataset, nuScenes_Dataset
 from opts import parser
 from transform import *
 import torchvision
@@ -61,6 +61,7 @@ def main():
                         help="Path to the directory of log.")
     parser.add_argument('--VPN-weights', type=str)
     parser.add_argument('--task-id', type=str)
+    parser.add_argument('--scenario', type=str, default='indoor')
 
     args = parser.parse_args()
 
@@ -74,23 +75,40 @@ def main():
         transform_type=args.transform_type,
     )
 
-    train_source_dataset = House3D_Dataset(args.source_dir, args.train_source_list,
-                        transform=torchvision.transforms.Compose([
-                             Stack(roll=True),
-                             ToTorchFormatTensor(div=True),
-                             GroupNormalize(mean_rgb, std_rgb)
-                        ]),
-                        num_views=network_config.num_views, input_size=args.input_resolution,
-                        label_size=args.SegSize)
-
-    train_target_dataset = MP3D_Dataset(args.target_dir, args.train_target_list,
-                         transform=torchvision.transforms.Compose([
-                            Stack(roll=True),
-                            ToTorchFormatTensor(div=True),
-                            GroupNormalize(mean_rgb, std_rgb)
-                        ]),
-                        num_views=network_config.num_views, input_size=args.input_resolution,
-                        label_size=args.SegSize_target)
+    if args.scenario == 'indoor':
+        train_source_dataset = House3D_Dataset(args.source_dir, args.train_source_list,
+                            transform=torchvision.transforms.Compose([
+                                 Stack(roll=True),
+                                 ToTorchFormatTensor(div=True),
+                                 GroupNormalize(mean_rgb, std_rgb)
+                            ]),
+                            num_views=network_config.num_views, input_size=args.input_resolution,
+                            label_size=args.SegSize)
+        train_target_dataset = MP3D_Dataset(args.target_dir, args.train_target_list,
+                             transform=torchvision.transforms.Compose([
+                                Stack(roll=True),
+                                ToTorchFormatTensor(div=True),
+                                GroupNormalize(mean_rgb, std_rgb)
+                            ]),
+                            num_views=network_config.num_views, input_size=args.input_resolution,
+                            label_size=args.SegSize_target)
+    elif args.scenario == 'traffic':
+        train_source_dataset = Carla_Dataset(args.source_dir, args.train_source_list,
+                                             transform=torchvision.transforms.Compose([
+                                                 Stack(roll=True),
+                                                 ToTorchFormatTensor(div=True),
+                                                 GroupNormalize(mean_rgb, std_rgb)
+                                             ]),
+                                             num_views=network_config.num_views, input_size=args.input_resolution,
+                                             label_size=args.SegSize)
+        train_target_dataset = nuScenes_Dataset(args.target_dir, args.train_target_list,
+                                                transform=torchvision.transforms.Compose([
+                                                    Stack(roll=True),
+                                                    ToTorchFormatTensor(div=True),
+                                                    GroupNormalize(mean_rgb, std_rgb)
+                                                ]),
+                                                num_views=network_config.num_views, input_size=args.input_resolution,
+                                                label_size=args.SegSize_target)
 
     source_loader = torch.utils.data.DataLoader(
         train_source_dataset, batch_size=args.batch_size,
@@ -110,11 +128,7 @@ def main():
 
     model_D1 = FCDiscriminator(num_classes=args.num_classes)
     model_D1 = nn.DataParallel(model_D1.cuda())
-    # model_D2 = FCDiscriminator(num_classes=args.num_classes).cuda()
     model_D1.train()
-    # model_D1.to(device)
-    # model_D2.train()
-    # model_D2.to(device)
 
     if args.VPN_weights:
         if os.path.isfile(args.VPN_weights):
@@ -132,7 +146,6 @@ def main():
         if os.path.isfile(args.resume_G):
             print(("=> loading checkpoint '{}'".format(args.resume_G)))
             state_dict = torch.load(args.resume_G)
-            # args.start_epoch = checkpoint['epoch']
             mapper.load_state_dict(state_dict)
             print(("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.evaluate, checkpoint['epoch'])))
@@ -158,16 +171,9 @@ def main():
     optimizer_D1 = optim.Adam(model_D1.parameters(), lr=args.learning_rate_D, betas=(0.9, 0.99))
     optimizer_D1.zero_grad()
 
-    # optimizer_D2 = optim.Adam(model_D2.parameters(), lr=args.start_lr, betas=(0.9, 0.99))
-    # optimizer_D2.zero_grad()
-
 
     criterion_seg = nn.NLLLoss(weight=None, size_average=True)
     criterion_bce = nn.BCEWithLogitsLoss()
-
-    # if not os.path.isdir(args.log_root):
-    #     os.mkdir(os.path.join(args.log_root, args.task_id))
-    # log_train = open(os.path.join(args.log_root, args '%s.csv' % args.store_name), 'w')
 
     train(source_loader, target_loader, mapper, model_D1,
           criterion_seg, criterion_bce, optimizer, optimizer_D1, resume_iter)
@@ -175,7 +181,6 @@ def main():
 def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, optimizer, optimizer_D1, resume_iter):
     source_loader_iter = enumerate(source_loader)
 
-    # raise NotImplementedError
     target_loader_iter = enumerate(target_loader)
 
     # set up tensor board
@@ -212,7 +217,6 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
         for sub_i in range(args.iter_size_G):
             # train with source
 
-            # raise NotImplementedError
             try:
                 _, batch = source_loader_iter.__next__()
             except:
@@ -223,20 +227,12 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
             input_rgb_var = torch.autograd.Variable(rgb_stack).cuda()
 
             _, pred_feat = mapper(input_rgb_var, return_feat=True)
-            # _ = _.view(-1, args.num_class)
-            # label_var = label_var.view(-1)
-            # seg_loss = seg_loss(_, label_var)
-            # print(seg_loss.item())
-            # raise NotImplementedError
-
-            # print(pred_feat[0, 0, 0, :])
 
             pred_feat = pred_feat.transpose(3, 2).transpose(2, 1).contiguous()
             pred = interp(pred_feat)
 
             pred = F.log_softmax(pred, dim=1)
             pred = pred.transpose(1, 2).transpose(2, 3).contiguous()
-            # print(pred[0, 0, 0, :])
 
             label_var = label_var.view(-1)
             output = pred.view(-1, args.num_class)
@@ -277,8 +273,6 @@ def train(source_loader, target_loader, mapper, model_D1, seg_loss, bce_loss, op
 
             pred = pred.detach()
             pred = pred.transpose(3, 2).transpose(2, 1).contiguous()
-            # print(pred.size())
-            # raise NotImplementedError
             D_out = model_D1(torch.exp(pred))
 
             loss_D = bce_loss(D_out, torch.FloatTensor(D_out.data.size()).fill_(source_label).cuda())
