@@ -14,6 +14,9 @@ We release the code of the View Parsing Networks, the main model for Cross-view 
 
 ### Training Command
 ```
+# Training in indoor-room scenarios, using RGB input modality.
+python -u train.py --fc-dim 256 --use-depth false --use-mask false --transform-type fc --input-resolution 400 --label-res 25 --store-name [STORE_NAME] --n-views 8 --batch-size 48 -j 10 --data_root [PATH_TO_DATASET_ROOT] --train-list [PATH_TO_TRAIN_LIST] --eval-list [PATH_TO_EVAL_LIST]
+
 # Training in driving-traffic scenarios, using RGB input modality.
-python -u train_carla.py --fc-dim 256 --use-depth false --use-mask false --transform-type fc --input-resolution 400 --label-res 25 --store-name carla_6 --n-views 6 --batch-size 48 -j 10 --data_root ./data/Carla_Dataset_v1/ --train-list tools/train_source_list.txt --eval-list tools/val_source_list.txt
+python -u train_carla.py --fc-dim 256 --use-depth false --use-mask false --transform-type fc --input-resolution 400 --label-res 25 --store-name [STORE_NAME] --n-views 6 --batch-size 48 -j 10 --data_root [PATH_TO_DATASET_ROOT] --train-list [PATH_TO_TRAIN_LIST] --eval-list [PATH_TO_EVAL_LIST]
 ```
