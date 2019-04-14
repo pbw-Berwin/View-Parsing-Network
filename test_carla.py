@@ -12,7 +12,7 @@
 """
 from utils import Foo
 from models import VPNModel
-from datasets_carla import OVMDataset
+from datasets import OVMDataset
 from opts import parser
 from transform import *
 import torchvision
