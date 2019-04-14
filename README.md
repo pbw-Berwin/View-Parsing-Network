@@ -10,7 +10,7 @@ We release the code of the View Parsing Networks, the main model for Cross-view 
 
 ### Data processing (use House3D for example)
 - Use [get_training_data_from_house3d.py](https://github.com/pbw-Berwin/View-Parsing-Network/blob/master/tools/get_trainning_data_from_house3d.py) to extract data from House3D environment.
-- Use [process_data_for_VPN.py](https://github.com/pbw-Berwin/View-Parsing-Network/blob/master/tools/process_data_for_VPN.py) to split training set and validation set.
+- Use [process_data_for_VPN.py](https://github.com/pbw-Berwin/View-Parsing-Network/blob/master/tools/process_data_for_VPN.py) to split training set and validation set, and visualize data.
 
 ### Training Command
 ```
@@ -29,4 +29,20 @@ python -u test.py --fc-dim 256 --use-depth false --use-mask false --transform-ty
 # Testing in driving-traffic scenarios, using RGB input modality, with 6 input views.
 python -u test_carla.py --fc-dim 256 --use-depth false --use-mask false --transform-type fc --input-resolution 400 --label-res 25 --store-name [STORE_NAME] --n-views 6 --batch-size 4 --test-views 6 --data_root [PATH_TO_DATASET_ROOT] --eval-list [PATH_TO_EVAL_LIST] --num-class [NUM_CLASS] -j 10 --weights [PATH_TO_PRETRAIN_MODEL]
 ```
+
+## Transfer learning for sim-to-real adaptation
+
+### Data processing (use indoor-room scenarios for example)
+- Use [process_transfer_indoor_data.py](https://github.com/pbw-Berwin/View-Parsing-Network/blob/master/tools/process_transfer_indoor_data.py) to split source domain set and target domain set.
+
+### Training Command
+```
+# Training in indoor-room scenarios, using RGB input modality, with 8 input views.
+python -u train_transfer.py --fc-dim 256 --use-depth false --use-mask false --transform-type fc --input-resolution 400 --label-res 25 --store-name [STORE_NAME] --n-views 8 --batch-size 48 -j 10 --data_root [PATH_TO_DATASET_ROOT] --train-list [PATH_TO_TRAIN_LIST] --eval-list [PATH_TO_EVAL_LIST]
+```
+
+## TODO
+
+* TODO: Integration script
+* TODO: Navigation part
 
