@@ -38,7 +38,7 @@ python -u test_carla.py --fc-dim 256 --use-depth false --use-mask false --transf
 ### Training Command
 ```
 # Training in indoor-room scenarios, using RGB input modality, with 8 input views.
-python -u train_transfer.py --fc-dim 256 --use-depth false --use-mask false --transform-type fc --input-resolution 400 --label-res 25 --store-name [STORE_NAME] --n-views 8 --batch-size 48 -j 10 --data_root [PATH_TO_DATASET_ROOT] --train-list [PATH_TO_TRAIN_LIST] --eval-list [PATH_TO_EVAL_LIST]
+python -u train_transfer.py --task-id [TASK_NAME] --num-class [NUM_CLASS] --learning-rate-D 3e-6 --iter-size-G 1 --iter-size-D 1 --snapshot-dir ./snapshot --batch-size 20 --tensorboard true --n-views 6 --train_source_list [PATH_TO_TRAIN_LIST] --train_target_list [PATH_TO_EVAL_LIST] --VPN-weights [PATH_TO_PRETRAINED_WEIGHT] --scenarios indoor
 ```
 
 ## TODO
