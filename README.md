@@ -1,10 +1,13 @@
 # Cross-view Semantic Segmentation for Sensing Surroundings
 
-We release the code of the View Parsing Networks.
+We release the code of the View Parsing Networks, the main model for Cross-view Semantic Segmentation task.
 
 ### Requirement
 - Install the [House3D](https://github.com/facebookresearch/House3D) simulator, or [Gibson](http://gibsonenv.stanford.edu) simulator.
 - Software: Ubuntu 16.04.3 LTS, CUDA>=8.0, Python>=3.5, PyTorch>=0.4.0
+
+### Data processing
+- Use
 
 ### Training Command
 ```
