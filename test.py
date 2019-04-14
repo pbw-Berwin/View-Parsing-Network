@@ -18,14 +18,9 @@ from transform import *
 import torchvision
 import torch
 from torch import nn
-from torch.optim.lr_scheduler import MultiStepLR
-from torch import optim
 import os
 import time
-from torch.nn.utils import clip_grad_norm
-# from examples.cognitive_mapping.Logger import Logger
 import cv2
-import shutil
 import dominate
 from dominate.tags import *
 
