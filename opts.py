@@ -13,7 +13,7 @@ parser.add_argument('--data_root', type=str, default='/data/vision/oliva/sceneda
 parser.add_argument('--test-dir', type=str, default='')
 parser.add_argument('--train-list', type=str, default='./metadata/train_list.txt')
 parser.add_argument('--eval-list', type=str, default='./metadata/val_list.txt')
-parser.add_argument('--start_lr', type=float, default=2e-4)
+parser.add_argument('--start-lr', type=float, default=2e-4)
 parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float,
                     metavar='W', help='weight decay (default: 5e-4)')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
@@ -62,5 +62,5 @@ parser.add_argument('--ppi', type=int, default=4)
 parser.add_argument('--scale', type=float, default=2)
 parser.add_argument('--trajectory-file', type=str, default='')
 parser.add_argument('--real-scale', type=float, default=1.2)
-parser.add_argument('--use_topdown', type=str2bool, default=False)
-parser.add_argument('--visual_input', type=str2bool, default=False)
+parser.add_argument('--use-topdown', type=str2bool, default=False)
+parser.add_argument('--visual-input', type=str2bool, default=False)
