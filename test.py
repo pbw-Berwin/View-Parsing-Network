@@ -47,7 +47,7 @@ def main():
                              ToTorchFormatTensor(div=True),
                              GroupNormalize(mean_rgb, std_rgb)
                          ]),
-                         n_views=network_config.num_views, input_size=args.input_resolution,
+                         num_views=network_config.num_views, input_size=args.input_resolution,
                          label_size=args.segSize, use_mask=args.use_mask, use_depth=args.use_depth, is_train=False)
 
     val_loader = torch.utils.data.DataLoader(
